@@ -1,0 +1,4 @@
+streamlit>=1.30
+playwright>=1.40
+openpyxl>=3.1
+pandas>=2.0

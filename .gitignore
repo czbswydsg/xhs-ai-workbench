@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 运行时数据（首次运行自动生成，包含登录态与采集结果，切勿上传）
+cookies.json
+xhs_login.json
+xhs_notes.json
+xhs_master.json
+xhs_tasks.json
+xhs_prompts.json
+xhs_report.xlsx
+xhs_content.xlsx
+sessions/
+downloads/
+tasks/
+_cur_ctx.json
+_cur_notes.json
+_scrape_*.json
+_scrape_*.txt
+_img_*.json
+_img_*.txt
+
+# 日志
+*.log
+
+# 临时/系统
+*.tar.gz
+.DS_Store
+Thumbs.db
