@@ -2,7 +2,7 @@
 
 一个面向小红书（Xiaohongshu / RED）内容运营场景的**数据采集 → 爆款分析 → AI 内容生成**一体化 Web 应用。基于 Streamlit 构建，支持多访客隔离登录、真实数据采集、Excel 报告导出，可直接部署到云端作为 SaaS 式工具使用。
 
-> 🚀 **在线体验**：部署后填写你的 Streamlit Cloud 地址，例如 `https://xxx.streamlit.app`
+> 🚀 **在线体验**：https://xhs-ai-workbench-h7nfaj3xlhaqygewdknyai.streamlit.app/
 
 ## 功能一览
 
