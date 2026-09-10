@@ -85,6 +85,8 @@ TASKS_FILE = os.path.join(HERE, "xhs_tasks.json")
 TASK_DIR = os.path.join(HERE, "tasks")
 SCRAPE_PROGRESS = os.path.join(HERE, "_scrape_progress.txt")
 SCRAPE_STATUS = os.path.join(HERE, "_scrape_status.json")
+# 云端无头模式下，采集等待扫码期间的登录页截图（含二维码），由进度页 st.image 展示
+SCRAPE_QR = os.path.join(HERE, "_scrape_qr.png")
 IMG_PROGRESS = os.path.join(HERE, "_img_progress.txt")
 IMG_STATUS = os.path.join(HERE, "_img_status.json")
 IMG_RESULT = os.path.join(HERE, "_img_result.json")
@@ -593,10 +595,17 @@ def start_scrape(cfg):
 
     def worker():
         try:
+            # 云端无头模式：浏览器在服务器后台运行，不弹窗口；
+            # 登录二维码会截图显示在页面下方，用手机小红书 App 扫码即可。
+            if headless:
+                append_progress(SCRAPE_PROGRESS,
+                                "云端无头模式：浏览器在服务器后台运行，如需要登录，"
+                                "二维码会显示在页面下方，请用手机小红书 App 扫码")
             scraper = XHSScraper(
                 headless=headless,
                 progress=lambda m: append_progress(SCRAPE_PROGRESS, m),
                 cookie_file=cookie_file,
+                qr_capture_path=SCRAPE_QR if headless else None,
             )
             notes = scraper.run(
                 keyword=cfg["keyword"],
@@ -647,6 +656,11 @@ def show_scrape_progress():
             persist_context(task, recs)
             if os.path.exists(SCRAPE_STATUS):
                 os.remove(SCRAPE_STATUS)
+            if os.path.exists(SCRAPE_QR):
+                try:
+                    os.remove(SCRAPE_QR)
+                except Exception:
+                    pass
             st.success(f"采集完成，共 {len(recs)} 条竞品帖子，已自动完成爆款分析")
             # 自动进入下一步：帖子数据
             st.session_state.page = "帖子数据"
@@ -659,6 +673,15 @@ def show_scrape_progress():
     with st.status("正在采集竞品内容…", state="running", expanded=True):
         for ln in lines:
             st.write("· " + ln)
+    # 云端无头模式下把登录二维码展示在页面上，用户手机扫码完成登录
+    if os.path.exists(SCRAPE_QR):
+        try:
+            st.markdown("#### 📱 扫码登录小红书（云端无头模式，浏览器不弹窗）")
+            st.image(SCRAPE_QR, width=280,
+                     caption="用手机小红书 App 扫一扫（二维码约 180 秒有效，过期可点「重新发起」；"
+                             "登录成功后本页会自动继续采集）")
+        except Exception:
+            pass
     time.sleep(0.6)
     st.rerun()
 

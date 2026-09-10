@@ -190,17 +190,21 @@ EXTRACT_DETAIL_JS = r"""
 
 
 class XHSScraper:
-    def __init__(self, headless=False, login_timeout=180, progress=None, cookie_file=None):
+    def __init__(self, headless=False, login_timeout=180, progress=None, cookie_file=None,
+                 qr_capture_path=None):
         """
         progress: 可选回调 progress(msg) 用于输出进度
         cookie_file: 登录态 cookie 的存取路径。默认用全局 cookies.json；
                      传入自定义路径时（如 sessions/{visitor}.json）实现"每人独立登录态"，
                      不传则与旧行为完全一致（多用户扩展点）。
+        qr_capture_path: 可选；在无头模式等待扫码时，把登录页（含二维码）截图持续写到
+                     该路径，供界面（如 Streamlit st.image）展示后由用户手机扫码。
         """
         self.headless = headless
         self.login_timeout = login_timeout
         self.progress = progress or (lambda m: None)
         self._cookie_file = cookie_file or COOKIE_FILE
+        self.qr_capture_path = qr_capture_path
         self.pw = None
         self.browser = None
         self.context = None
@@ -295,6 +299,13 @@ class XHSScraper:
                 self.page.bring_to_front()
             except Exception:
                 pass
+            # 无头模式（云端）下用户看不到浏览器窗口：把登录页（含二维码）持续
+            # 截图到 qr_capture_path，由界面 st.image 展示，用户手机扫码即可登录。
+            if self.qr_capture_path:
+                try:
+                    self.page.screenshot(path=self.qr_capture_path)
+                except Exception:
+                    pass
             self.page.wait_for_timeout(poll_interval * 1000)
         self._log("登录等待超时，可点界面「取消登录」或重新发起")
         raise TimeoutError("登录等待超时（未检测到新的 web_session）")
