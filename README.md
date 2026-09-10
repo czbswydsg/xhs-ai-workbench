@@ -2,7 +2,7 @@
 
 一个面向小红书（Xiaohongshu / RED）内容运营场景的**数据采集 → 爆款分析 → AI 内容生成**一体化 Web 应用。基于 Streamlit 构建，支持多访客隔离登录、真实数据采集、Excel 报告导出，可直接部署到云端作为 SaaS 式工具使用。
 
-> 🚀 **在线体验**：https://xhs-ai-workbench-h7nfaj3xlhaqygewdknyai.streamlit.app/
+> 🚀 **在线体验**：部署后填写你的 Streamlit Cloud 地址，例如 `https://xxx.streamlit.app`
 
 ## 功能一览
 
@@ -65,8 +65,9 @@ streamlit run app.py   # 打开 http://localhost:8501
 
 ## 演示提示
 
-- 云端采集受小红书风控影响可能不稳定（机房 IP），演示时可先用「设置」页导入一份 Excel 样例数据，完整走通 分析 → 内容生成 流程。
-- 本仓库不含任何登录态（`cookies.json` / `sessions/`）与采集数据，首次运行自动生成，已通过 `.gitignore` 排除。
+- **内置示例数据**：仓库根目录的 `xhs_notes.json` 为演示用构造样例（15 条，字段结构与真实采集完全一致，每条带 `"demo": true` 标记）。应用启动时会自动加载，方便面试官/访客随时完整走通「帖子数据 → 爆款分析 → 内容生成」全流程，无需先采集。
+- 云端采集受小红书风控与容器内存限制可能不稳定（机房 IP / 约 1GB 内存），点击「开始采集」能采到就显示真实数据；采不到时示例数据兜底，演示不受影响。
+- 本仓库不含任何登录态（`cookies.json` / `sessions/`）与真实采集数据，首次运行自动生成，已通过 `.gitignore` 排除。
 
 ## 说明
 
