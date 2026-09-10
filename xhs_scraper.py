@@ -269,9 +269,14 @@ class XHSScraper:
     def _wait_qr_login(self, old_value="", poll_interval=2):
         """等待用户扫码，直到出现新的 web_session cookie。超时抛 TimeoutError。
         poll_interval: 每次轮询间隔秒数（默认 2s，给浏览器 UI 充足响应时间，避免卡顿）。
+
+        云端无头修复：登录页用 domcontentloaded 快速加载（networkidle 在海外访问
+        小红书时经常 60s 超时，导致二维码迟迟截不出来）；截图只在已进入登录页时
+        进行，避免把首页/空白页当二维码展示；关键步骤都写入日志便于界面排查。
         """
-        self._log("请在弹出的浏览器中用手机扫码登录小红书…")
+        self._log("请用手机小红书 App 扫码登录（云端无头模式：二维码显示在页面下方）")
         opened_login = False
+        login_try = 0
         deadline = time.time() + self.login_timeout
         while time.time() < deadline:
             cur = (self._get_web_session() or {}).get("value", "")
@@ -289,11 +294,19 @@ class XHSScraper:
                 )
                 if not has_modal:
                     try:
-                        self.page.goto(BASE_URL + "/login", wait_until="networkidle",
-                                       timeout=60000)
+                        if login_try == 0:
+                            self._log("正在打开小红书登录页，准备截取登录二维码…")
+                        self.page.goto(BASE_URL + "/login",
+                                       wait_until="domcontentloaded",
+                                       timeout=30000)
+                        self.page.wait_for_timeout(2500)
                         opened_login = True
+                        self._log("已打开小红书登录页，二维码生成中…")
                     except Exception:
-                        pass
+                        login_try += 1
+                        if login_try >= 3:
+                            self._log("打开登录页较慢，自动重试中…")
+                            login_try = 0
             # 定期把浏览器置前，避免窗口被遮挡在后台看不到
             try:
                 self.page.bring_to_front()
@@ -303,7 +316,13 @@ class XHSScraper:
             # 截图到 qr_capture_path，由界面 st.image 展示，用户手机扫码即可登录。
             if self.qr_capture_path:
                 try:
-                    self.page.screenshot(path=self.qr_capture_path)
+                    url_now = self.page.url or ""
+                    # 只截登录页，避免把首页/空白页当二维码展示
+                    if opened_login or "login" in url_now:
+                        self.page.screenshot(path=self.qr_capture_path)
+                        if not getattr(self, "_qr_notified", False):
+                            self._log("📱 二维码已就绪：请用手机小红书 App 扫码登录")
+                            self._qr_notified = True
                 except Exception:
                     pass
             self.page.wait_for_timeout(poll_interval * 1000)
