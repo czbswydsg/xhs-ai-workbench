@@ -72,6 +72,9 @@ def _is_cloud_env():
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(HERE, "xhs_notes.json")
+# 内置示例数据（15 条演示用样例，字段与真实采集一致）：当采集数据为空/被清空时兜底，
+# 保证「帖子数据 → 爆款分析 → 内容生成」在任何情况下都能演示。
+DEMO_NOTES_FILE = os.path.join(HERE, "demo_notes.json")
 MASTER_FILE = os.path.join(HERE, "xhs_master.json")
 DOWNLOAD_DIR = os.path.join(HERE, "downloads")
 COOKIE_FILE = os.path.join(HERE, "cookies.json")
@@ -429,6 +432,23 @@ def clear_login():
                 pass
 
 
+def load_notes_safe():
+    """按优先级返回可用笔记数据：真实采集数据(DATA_FILE) → 内置示例数据(demo_notes.json)。
+
+    采集 0 条、数据文件被清空、解析失败时自动降级到示例数据，保证演示链路不中断。
+    返回 None 仅当两层都不存在或都为空（极端情况）。
+    """
+    for path in (DATA_FILE, DEMO_NOTES_FILE):
+        try:
+            if os.path.exists(path):
+                raw = json.load(open(path, encoding="utf-8"))
+                if isinstance(raw, list) and raw:
+                    return raw
+        except Exception:
+            continue
+    return None
+
+
 def normalize_notes(notes):
     recs = []
     for n in notes:
@@ -545,13 +565,10 @@ def restore_current_context():
                 data = load_task_data(tid)
                 if data:
                     notes = data
-        if notes is None and os.path.exists(DATA_FILE):
-            # 快照任务数据缺失/从未落盘 → 回退最近一次采集的原始数据
-            try:
-                raw = json.load(open(DATA_FILE, encoding="utf-8"))
-                notes = raw if raw else None
-            except Exception:
-                notes = None
+        if notes is None:
+            # 快照任务数据缺失/从未落盘 → 回退最近一次采集的原始数据；
+            # 采集数据为空/被清空 → 兜底内置示例数据（保证演示链路可用）
+            notes = load_notes_safe()
         if not notes:
             return False
         recs, summary = analyze_notes(notes)
@@ -615,8 +632,10 @@ def start_scrape(cfg):
                 detail_limit=cfg["detail_limit"] if cfg["detail_limit"] else None,
                 download_images=cfg["download_images"],
             )
-            with open(DATA_FILE, "w", encoding="utf-8") as f:
-                json.dump(notes, f, ensure_ascii=False, indent=2)
+            if notes:
+                # 只有采集到内容才落盘，避免 0 条结果把已有数据（含示例数据）冲成空
+                with open(DATA_FILE, "w", encoding="utf-8") as f:
+                    json.dump(notes, f, ensure_ascii=False, indent=2)
             # 仅主账号（非访客）采集成功才翻转本机全局登录态；
             # 访客用自己的账号，不应污染主账号的登录标记。
             if not is_visitor_run:
@@ -643,7 +662,7 @@ def show_scrape_progress():
         if err:
             st.error("采集失败：" + str(err))
         else:
-            notes = json.load(open(DATA_FILE, encoding="utf-8"))
+            notes = load_notes_safe() or []
             recs, summary = analyze_notes(notes)
             st.session_state.notes = recs
             st.session_state.analysis_summary = summary
@@ -1614,8 +1633,8 @@ def page_posts():
                 st.rerun()
         with c2:
             if st.button("📂 加载本地已采集数据", key="load_local"):
-                if os.path.exists(DATA_FILE):
-                    notes = json.load(open(DATA_FILE, encoding="utf-8"))
+                notes = load_notes_safe()
+                if notes:
                     recs, summary = analyze_notes(notes)
                     st.session_state.notes = recs
                     st.session_state.analysis_summary = summary
