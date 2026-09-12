@@ -75,6 +75,10 @@ DATA_FILE = os.path.join(HERE, "xhs_notes.json")
 # 内置示例数据（15 条演示用样例，字段与真实采集一致）：当采集数据为空/被清空时兜底，
 # 保证「帖子数据 → 爆款分析 → 内容生成」在任何情况下都能演示。
 DEMO_NOTES_FILE = os.path.join(HERE, "demo_notes.json")
+# 6 主题演示数据（喜茶/奈雪/防晒霜/女装/护肤品/小户型沙发，每主题 6 条）：
+# 点首页/侧栏「快捷词」→ 直接加载该主题本地数据 → 立即进入数据分析/爆款分析，
+# 不依赖真实采集，面试官/访客随时可完整演示全流程。
+DEMO_TOPICS_FILE = os.path.join(HERE, "demo_topics.json")
 MASTER_FILE = os.path.join(HERE, "xhs_master.json")
 DOWNLOAD_DIR = os.path.join(HERE, "downloads")
 COOKIE_FILE = os.path.join(HERE, "cookies.json")
@@ -447,6 +451,34 @@ def load_notes_safe():
         except Exception:
             continue
     return None
+
+
+def load_topic_demo(topic):
+    """点快捷词：加载该主题的本地演示数据，并立即完成分析、跳转「帖子数据」页。
+
+    数据来自 demo_topics.json（预置 6 主题 × 6 条真实感样例）。
+    加载后 notes / analysis_summary / current_task 即就绪，
+    「帖子数据 / 爆款分析 / 内容生成」无需采集即可完整演示。
+    """
+    try:
+        raw = []
+        if os.path.exists(DEMO_TOPICS_FILE):
+            all_notes = json.load(open(DEMO_TOPICS_FILE, encoding="utf-8"))
+            raw = [n for n in all_notes if (n.get("topic") or "") == topic]
+        if not raw:
+            st.warning(f"暂无「{topic}」的演示数据，可点击「开始采集」进行真实采集。")
+            return
+        recs, summary = analyze_notes(raw)
+        task = make_task({"keyword": topic, "goals": []}, recs, "已分析")
+        st.session_state.notes = recs
+        st.session_state.analysis_summary = summary
+        st.session_state.current_task = task
+        st.session_state["ctx_banner"] = (
+            f"已加载「{topic}」演示数据 · {len(recs)} 篇（本地示例，无需采集，可直接演示）")
+        st.session_state.page = "帖子数据"
+        print(f"[load_topic_demo] topic={topic} notes={len(recs)}")
+    except Exception as e:
+        print("[load_topic_demo] failed:", e)
 
 
 def normalize_notes(notes):
@@ -1295,13 +1327,14 @@ def render_sidebar():
 
         def set_quick_kw(q):
             st.session_state.keyword = q
+            load_topic_demo(q)
         # 一行快捷词按钮
         qcols = st.columns(3)
         for i, q in enumerate(quick):
             qcols[i % 3].button(q, key="quick_side_" + q,
                                 on_click=set_quick_kw, args=(q,),
                                 use_container_width=True)
-        st.caption("快捷词会回填到左侧「搜索关键词」框")
+        st.caption("点快捷词 = 加载该主题演示数据并直接分析（无需采集）")
 
         st.selectbox("采集数量", [30, 50, 100, 200, 500], key="count")
         st.caption("更多配置（采集详情 / 下载原图 / 分析目标）请到「小红书采集」页。")
@@ -1349,13 +1382,15 @@ def page_home():
         with f3:
             started = st.button("🚀 开始采集竞品内容", type="primary",
                                 use_container_width=True, key="home_start")
-        # 快捷词：on_click 里同步到侧栏 keyword 是安全的（回调在下一次脚本重跑前运行）
-        st.caption("快捷词：")
+        # 快捷词：on_click 里同步到侧栏 keyword + 加载该主题演示数据
+        # （演示版：点词即出数据，无需真实采集；开始采集按钮仍保留真实采集能力）
+        st.caption("快捷词（点一下直接演示该主题数据分析）：")
         quick = ["喜茶", "奈雪", "防晒霜", "女装", "护肤品", "小户型沙发"]
 
         def set_home_kw(q):
             st.session_state.keyword = q
             st.session_state.home_kw = q
+            load_topic_demo(q)
         bcols = st.columns(6)
         for i, q in enumerate(quick):
             bcols[i].button(q, key="home_quick_" + q,
@@ -1623,6 +1658,10 @@ def page_xhs_collect():
 # 页面：帖子数据（当前任务的帖子列表 / 筛选 / 排序 / 详情 / 下载）
 # ======================================================================
 def page_posts():
+    # 快捷词加载/恢复上下文提示（仅展示一次）
+    banner = st.session_state.pop("ctx_banner", None)
+    if banner:
+        st.success(banner, icon="💾")
     if not st.session_state.notes:
         st.info("当前暂无帖子数据，请先完成竞品采集。可：① 在左侧采集竞品；"
                 "② 从「设置」上传 Excel；③ 加载本地已采集数据。")
