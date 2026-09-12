@@ -937,17 +937,35 @@ def current_cfg():
     }
 
 
+def demo_topic_names():
+    """返回内置演示主题名集合（demo_topics.json 中出现的 topic 字段）。"""
+    try:
+        if os.path.exists(DEMO_TOPICS_FILE):
+            all_notes = json.load(open(DEMO_TOPICS_FILE, encoding="utf-8"))
+            return {n.get("topic") for n in all_notes if n.get("topic")}
+    except Exception:
+        pass
+    return set()
+
+
 def start_scrape_from_settings():
     """按当前采集配置启动真实采集。
 
     返回值：
+      - "demo"              关键词命中内置演示主题 → 已加载该主题本地数据（不启动真实采集）
       - True                已启动采集线程；
       - False               关键词为空（由调用方提示）；
       - "need_visitor_login" 当前是访客身份但尚未扫码绑定（调用方应引导访客扫码）。
     关键词/数量由 current_cfg() 内部合并首页输入与侧栏设置。
     """
-    if not current_cfg()["keyword"]:
+    kw = (current_cfg()["keyword"] or "").strip()
+    if not kw:
         return False
+    # 演示模式：关键词命中内置演示主题（喜茶/奈雪/防晒霜/女装/护肤品/小户型沙发）→
+    # 直接加载该主题本地数据并进入分析，效果等同"采集完成"，供面试/演示随时可用。
+    if kw in demo_topic_names():
+        load_topic_demo(kw)
+        return "demo"
     ident = account_identity()
     if ident["choice"] == "visitor":
         # 访客身份：登录态必须来自该访客自己的隔离文件；未绑定则不启动（防误用主人 cookies）
