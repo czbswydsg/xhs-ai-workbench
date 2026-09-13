@@ -481,6 +481,31 @@ def load_topic_demo(topic):
         print("[load_topic_demo] failed:", e)
 
 
+def load_demo_general(kw):
+    """云端受限兜底：任意关键词 → 加载内置通用示例数据（demo_notes.json 15 条）演示。
+
+    云端无法稳定运行 Playwright 采集（内存不足/无显示器），未命中内置主题词时
+    也降级为示例数据，保证「填词 → 开始采集 → 帖子数据 → 爆款分析」链路随时可演示；
+    本地/自部署环境不进入此分支（走真实采集）。
+    """
+    try:
+        notes = load_notes_safe()
+        if not notes:
+            st.warning("暂无可用演示数据，请先在本地环境进行真实采集。")
+            return
+        recs, summary = analyze_notes(notes)
+        task = make_task({"keyword": kw, "goals": []}, recs, "已分析")
+        st.session_state.notes = recs
+        st.session_state.analysis_summary = summary
+        st.session_state.current_task = task
+        st.session_state["ctx_banner"] = (
+            f"已加载「{kw}」演示数据 · {len(recs)} 篇（云端采集受限，自动使用内置示例数据演示）")
+        st.session_state.page = "帖子数据"
+        print(f"[load_demo_general] kw={kw} notes={len(recs)}")
+    except Exception as e:
+        print("[load_demo_general] failed:", e)
+
+
 def normalize_notes(notes):
     recs = []
     for n in notes:
@@ -965,6 +990,11 @@ def start_scrape_from_settings():
     # 直接加载该主题本地数据并进入分析，效果等同"采集完成"，供面试/演示随时可用。
     if kw in demo_topic_names():
         load_topic_demo(kw)
+        return "demo"
+    # 云端受限环境（免费版内存不足、无显示器）：任何关键词都降级为内置通用示例数据，
+    # 保证「填词 → 点开始采集 → 出数据」的完整演示链路；本机/自部署仍走真实采集。
+    if _is_cloud_env():
+        load_demo_general(kw)
         return "demo"
     ident = account_identity()
     if ident["choice"] == "visitor":
