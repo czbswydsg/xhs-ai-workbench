@@ -1,0 +1,20 @@
+name: Keep Streamlit App Alive
+
+on:
+  schedule:
+    # 每 4 小时访问一次应用，防止 Streamlit 免费版因无活动而休眠
+    - cron: '17 */4 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Streamlit app health endpoint
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 \
+            "https://xhs-ai-workbench-h7nfaj3xlhaqygewdknyai.streamlit.app/_stcore/health" || true)
+          echo "Health check HTTP $code"
+          curl -s -o /dev/null --max-time 60 \
+            "https://xhs-ai-workbench-h7nfaj3xlhaqygewdknyai.streamlit.app/" || true
+          echo "Wake request sent"
