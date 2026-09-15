@@ -2,19 +2,28 @@ name: Keep Streamlit App Alive
 
 on:
   schedule:
-    # 每 4 小时访问一次应用，防止 Streamlit 免费版因无活动而休眠
-    - cron: '17 */4 * * *'
+    # 每 30 分钟请求完整页面（模拟真实访问），尽量降低免费版休眠概率
+    - cron: '7,37 * * * *'
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Streamlit app health endpoint
+      - name: Request full app page to keep session active
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 \
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 -A "$UA" \
+            "https://xhs-ai-workbench-h7nfaj3xlhaqygewdknyai.streamlit.app/" || true)
+          echo "Home page HTTP $code"
+          # 再请求健康端点，触发真实容器拉起
+          hcode=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 -A "$UA" \
             "https://xhs-ai-workbench-h7nfaj3xlhaqygewdknyai.streamlit.app/_stcore/health" || true)
-          echo "Health check HTTP $code"
-          curl -s -o /dev/null --max-time 60 \
-            "https://xhs-ai-workbench-h7nfaj3xlhaqygewdknyai.streamlit.app/" || true
-          echo "Wake request sent"
+          echo "Health HTTP $hcode"
+          # 冷启动会返回 303（部署中），重复请求有助于加快拉起
+          for i in 1 2 3; do
+            curl -s -o /dev/null --max-time 90 -A "$UA" \
+              "https://xhs-ai-workbench-h7nfaj3xlhaqygewdknyai.streamlit.app/" || true
+            sleep 20
+          done
+          echo "Wake requests sent"
